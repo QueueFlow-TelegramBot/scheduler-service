@@ -1,13 +1,12 @@
 def dockerImage
+def environ = (env.BRANCH_NAME == 'main') ? 'prod' : 'dev'
+def workspace = env.GIT_URL.split('/').last().toLowerCase()
 
 pipeline {
     agent any
 
     environment {
-        JOB_NAME = "${env.JOB_NAME}"
-        BRANCH_NAME = "${env.BRANCH_NAME}"
-        ENV = (BRANCH_NAME == 'main' || BRANCH_NAME == 'master') ? 'prod' : 'dev'
-        IMAGE_NAME = "${DOCKERHUB_USERNAME}/${env.JOB_NAME}"
+        IMAGE_NAME = "${DOCKERHUB_USERNAME}/${workspace}"
     }
 
     stages {
@@ -42,7 +41,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    kubectl set image deployment/${env.JOB_NAME}-${env.ENV} ${env.JOB_NAME}=${IMAGE_NAME}:${env.BUILD_ID} --namespace=default
+                    kubectl set image deployment/${workspace}-${environ} *=${IMAGE_NAME}:${env.BUILD_ID} --namespace=default
                     """
                 }
             }
@@ -51,8 +50,8 @@ pipeline {
 
     post {
         always {
-            emailext body: "Project: ${env.JOB_NAME}\nBuild: ${env.BUILD_NUMBER}\nResult: ${currentBuild.currentResult}",
-                     subject: "Deployment Notification: ${env.JOB_NAME}",
+            emailext body: "Project: ${workspace}\nBuild: ${env.BUILD_NUMBER}\nResult: ${currentBuild.currentResult}",
+                     subject: "Deployment Notification: ${workspace} - Build #${env.BUILD_NUMBER}",
                      to: "dev-team@example.com"
         }
     }
