@@ -1,4 +1,6 @@
 def dockerImage
+def environ = (env.BRANCH_NAME == 'main') ? 'prod' : 'dev'
+def workspace = env.GIT_URL.split('/').last().toLowerCase()
 
 pipeline {
     agent any
