@@ -8,6 +8,10 @@ from aio_pika import ExchangeType
 
 from app.config import settings
 
+
+NOTIFICATION_QUEUE_NAME = "notifications"
+NOTIFICATION_ROUTING_KEY = "notification.*"
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,12 +40,8 @@ class RabbitMQManager:
         if self._exchange is None:
             raise RuntimeError("RabbitMQ not connected")
 
-        # Declare and bind queue
-        if routing_key.startswith("notification."):
-            queue = await self._channel.declare_queue(routing_key, auto_delete=True)
-        else:
-            queue = await self._channel.declare_queue(routing_key, durable=True)
-        await queue.bind(self._exchange, routing_key=routing_key)
+        queue = await self._channel.declare_queue(NOTIFICATION_QUEUE_NAME, durable=True, auto_delete=False)
+        await queue.bind(self._exchange, routing_key=NOTIFICATION_ROUTING_KEY)
 
         message = aio_pika.Message(
             body=json.dumps(body).encode(),
