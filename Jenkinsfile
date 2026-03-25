@@ -1,75 +1,48 @@
+def dockerImage
+
 pipeline {
     agent any
 
     environment {
-        PROJECT_NAME = "${env.PROJECT_NAME}"
-
-        // Infrastructure - Set these in Jenkins System Configuration
-        LXC_API_URL = "${env.LXC_API_BASE_URL}"
-        LXC_IP      = "${env.LXC_TARGET_IP}"
-        LXC_USER    = "${env.LXC_REMOTE_USER}"
-        
-        // Credentials - Set these in Jenkins Credentials Provider
-        SSH_CERT_ID   = credentials('lxc-deploy-key')
-        LXC_API_TOKEN = credentials('lxc-api-auth-token')
-        // TELEGRAM_BOT_TOKEN = credentials('telegram-bot-token')
+        WS = env.JOB_NAME.split('-')[0..-2].join('-')
+        ENV = env.JOB_NAME.split('-').last()
+        IMAGE_NAME = "${DOCKERHUB_USERNAME}/${WS}"
     }
 
     stages {
-        stage('Initialize') {
+        stage('Checkout') {
             steps {
                 checkout scm
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    [ -f requirements.txt ] && pip install -r requirements.txt
-                '''
             }
         }
 
-        stage('Quality Gate') {
+        stage('Build Docker Image') {
             steps {
-                sh '. venv/bin/activate && python3 -m unittest discover'
-            }
-        }
-
-        stage('Provision LXC') {
-            steps {
-                // TODO: Create an orchestrator to handle LxC lifecycle (create, list by tag, delete) and use it here to remove old containers based on tags (e.g., project name + commit hash)
                 script {
-                    def lxc = load 'lxc_manager.groovy'
-                    def commitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-
-                    // Set environment variables to be injected into the container
-                    // lxc.set_environment(env.LXC_API_URL, env.LXC_API_TOKEN, env.PROJECT_NAME, "DB_HOST", "db.${env.PROJECT_NAME}.local")
-
-                    lxc.create(env.LXC_API_URL, env.LXC_API_TOKEN, env.PROJECT_NAME, ["${env.PROJECT_NAME}", "${commitHash}"])
+                    dockerImage = docker.build("${IMAGE_NAME}:${env.BUILD_ID}")
                 }
             }
         }
 
-        stage('Deploy & Launch') {
+        stage('Push Docker Image') {
             steps {
-                // TODO: Create an orchestrator to handle LxC lifecycle (create, list by tag, delete) and use it here to remove old containers based on tags (e.g., project name + commit hash)
-                sshagent([env.SSH_CERT_ID]) {
+                script {
+                    echo "Docker Image Tag: ${IMAGE_NAME}:${env.BUILD_ID}"
+
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
+                        dockerImage.push("${env.BUILD_NUMBER}")
+                        dockerImage.push('latest')
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
                     sh """
-                        # Copy project files
-                        scp -o StrictHostKeyChecking=no -r . ${env.LXC_USER}@${env.LXC_IP}:/var/www/project
-
-                        # Execute remote setup and start
-                        ssh -o StrictHostKeyChecking=no ${env.LXC_USER}@${env.LXC_IP} 'cd /var/www/project && bash first_time.sh && bash start.sh'
+                    kubectl set image deployment/${WS}-${ENV} *=${IMAGE_NAME}:${env.BUILD_ID} --namespace=default
                     """
-                }
-            }
-        }
-
-        stage('Cleanup') {
-            steps {
-                // TODO: Create an orchestrator to handle LxC lifecycle (create, list by tag, delete) and use it here to remove old containers based on tags (e.g., project name + commit hash)
-                script {
-                    def lxc = load 'lxc_manager.groovy'
-
-                    lxc.delete(env.LXC_API_URL, env.LXC_API_TOKEN, env.PROJECT_NAME)
                 }
             }
         }
@@ -77,8 +50,8 @@ pipeline {
 
     post {
         always {
-            emailext body: "Project: ${env.JOB_NAME}\nBuild: ${env.BUILD_NUMBER}\nResult: ${currentBuild.currentResult}",
-                     subject: "Deployment Notification: ${env.JOB_NAME}",
+            emailext body: "Project: ${WS}\nBuild: ${env.BUILD_NUMBER}\nResult: ${currentBuild.currentResult}",
+                     subject: "Deployment Notification: ${WS} - Build #${env.BUILD_NUMBER}",
                      to: "dev-team@example.com"
         }
     }
