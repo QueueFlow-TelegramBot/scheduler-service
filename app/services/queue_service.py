@@ -12,26 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 async def join_queue(db: AsyncSession, rabbitmq: RabbitMQManager, room_id: str, user_id: str, user_name: str) -> QueueEntry:
-    # Check if already waiting
-    result = await db.execute(
-        select(QueueEntry).where(
-            QueueEntry.room_id == room_id,
-            QueueEntry.user_id == user_id,
-            QueueEntry.status == "waiting",
-        )
-    )
-    existing = result.scalar_one_or_none()
-    if existing:
-        raise ValueError("already_in_queue")
-
     # Count waiting for position
-    count_result = await db.execute(
-        select(func.count(QueueEntry.id)).where(
-            QueueEntry.room_id == room_id,
-            QueueEntry.status == "waiting",
-        )
-    )
-    count = count_result.scalar_one()
+    count_result = await rabbitmq.get_queue_length(f"room.{room_id}")
+    count = count_result if count_result is not None else 0
     position = count + 1
 
     entry = QueueEntry(

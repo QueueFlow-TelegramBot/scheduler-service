@@ -36,6 +36,13 @@ class RabbitMQManager:
             await self._connection.close()
         logger.info("RabbitMQ disconnected", extra={"action": "disconnect", "success": True})
 
+    async def get_queue_length(self, queue_name: str) -> int:
+        if self._channel is None:
+            raise RuntimeError("RabbitMQ not connected")
+
+        queue = await self._channel.declare_queue(queue_name, durable=True)
+        return queue.declaration_result.message_count
+
     async def publish(self, routing_key: str, body: dict):
         if self._exchange is None:
             raise RuntimeError("RabbitMQ not connected")
@@ -60,6 +67,7 @@ class RabbitMQManager:
         try:
             queue = await self._channel.declare_queue(queue_name, durable=True)
             message = await queue.get(no_ack=False)
+            await self._channel.queue_delete(queue_name, if_empty=True)
             if message is None:
                 logger.warning(
                     "No message in queue",
