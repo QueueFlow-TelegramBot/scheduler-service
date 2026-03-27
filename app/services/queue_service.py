@@ -12,6 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 async def join_queue(db: AsyncSession, rabbitmq: RabbitMQManager, room_id: str, user_id: str, user_name: str) -> QueueEntry:
+    # Publish to RabbitMQ
+    await rabbitmq.publish(
+        routing_key=f"room.{room_id}",
+        body={
+            "event": "user_joined",
+            "user_id": user_id,
+            "user_name": user_name,
+            "room_id": room_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
     # Count waiting for position
     count_result = await rabbitmq.get_queue_length(f"room.{room_id}")
     count = count_result if count_result is not None else 0
@@ -28,17 +40,6 @@ async def join_queue(db: AsyncSession, rabbitmq: RabbitMQManager, room_id: str, 
     await db.commit()
     await db.refresh(entry)
 
-    # Publish to RabbitMQ
-    await rabbitmq.publish(
-        routing_key=f"room.{room_id}",
-        body={
-            "event": "user_joined",
-            "user_id": user_id,
-            "user_name": user_name,
-            "room_id": room_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        },
-    )
     logger.info("User joined queue", extra={"room_id": room_id, "user_id": user_id, "position": position})
     return entry
 
