@@ -40,8 +40,8 @@ class RabbitMQManager:
         if self._exchange is None:
             raise RuntimeError("RabbitMQ not connected")
 
-        queue = await self._channel.declare_queue(NOTIFICATION_QUEUE_NAME, durable=True, auto_delete=False)
-        await queue.bind(self._exchange, routing_key=NOTIFICATION_ROUTING_KEY)
+        queue = await self._channel.declare_queue(routing_key, durable=True, auto_delete=False)
+        await queue.bind(self._exchange, routing_key=routing_key)
 
         message = aio_pika.Message(
             body=json.dumps(body).encode(),
