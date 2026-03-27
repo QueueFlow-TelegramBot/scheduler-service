@@ -67,7 +67,13 @@ class RabbitMQManager:
         try:
             queue = await self._channel.declare_queue(queue_name, durable=True)
             message = await queue.get(no_ack=False)
-            await self._channel.queue_delete(queue_name, if_empty=True)
+
+            if self.get_queue_length(queue_name) == 0:
+                try:
+                    await self._channel.queue_delete(queue_name, if_empty=True)
+                except:
+                    pass
+
             if message is None:
                 logger.warning(
                     "No message in queue",
