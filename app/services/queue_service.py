@@ -12,27 +12,19 @@ logger = logging.getLogger(__name__)
 
 
 async def join_queue(db: AsyncSession, rabbitmq: RabbitMQManager, room_id: str, user_id: str, user_name: str) -> QueueEntry:
-    # Check if already waiting
-    result = await db.execute(
-        select(QueueEntry).where(
-            QueueEntry.room_id == room_id,
-            QueueEntry.user_id == user_id,
-            QueueEntry.status == "waiting",
-        )
+    # Publish to RabbitMQ
+    await rabbitmq.publish(
+        routing_key=f"room.{room_id}",
+        body={
+            "event": "user_joined",
+            "user_id": user_id,
+            "user_name": user_name,
+            "room_id": room_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
     )
-    existing = result.scalar_one_or_none()
-    if existing:
-        raise ValueError("already_in_queue")
 
-    # Count waiting for position
-    count_result = await db.execute(
-        select(func.count(QueueEntry.id)).where(
-            QueueEntry.room_id == room_id,
-            QueueEntry.status == "waiting",
-        )
-    )
-    count = count_result.scalar_one()
-    position = count + 1
+    position = await rabbitmq.get_queue_length(f"room.{room_id}")
 
     entry = QueueEntry(
         room_id=room_id,
@@ -45,17 +37,6 @@ async def join_queue(db: AsyncSession, rabbitmq: RabbitMQManager, room_id: str, 
     await db.commit()
     await db.refresh(entry)
 
-    # Publish to RabbitMQ
-    await rabbitmq.publish(
-        routing_key=f"room.{room_id}",
-        body={
-            "event": "user_joined",
-            "user_id": user_id,
-            "user_name": user_name,
-            "room_id": room_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        },
-    )
     logger.info("User joined queue", extra={"room_id": room_id, "user_id": user_id, "position": position})
     return entry
 
@@ -74,10 +55,11 @@ async def get_next_in_queue(db: AsyncSession, rabbitmq: RabbitMQManager, room_id
             QueueEntry.room_id == room_id,
             QueueEntry.user_id == user_id,
             QueueEntry.status == "waiting",
-        )
+        ).order_by(QueueEntry.position.asc())
     )
-    entry = result.scalar_one_or_none()
-    position_served = entry.position if entry else 0
+
+    entry = result.scalars().first()
+    position_served = await rabbitmq.get_queue_length(f"room.{room_id}") + 1
     if entry:
         entry.status = "notified"
         await db.commit()
