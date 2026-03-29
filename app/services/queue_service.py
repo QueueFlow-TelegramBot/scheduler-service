@@ -24,11 +24,7 @@ async def join_queue(db: AsyncSession, rabbitmq: RabbitMQManager, room_id: str, 
         },
     )
 
-    # Count waiting for position
-    count_result = await rabbitmq.get_queue_length(f"room.{room_id}")
-    logger.info("User joined queue", extra={"room_id": room_id, "user_id": user_id, "current_queue_length": count_result})
-    count = count_result if count_result is not None else 0
-    position = count + 1
+    position = await rabbitmq.get_queue_length(f"room.{room_id}")
 
     entry = QueueEntry(
         room_id=room_id,
