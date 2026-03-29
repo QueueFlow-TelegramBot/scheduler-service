@@ -124,6 +124,7 @@ async def join_room(
         room_name=room.name,
         creator_name=room.creator_name,
         position=entry.position,
+        people_in_front=entry.position - 1,
     )
 
 
