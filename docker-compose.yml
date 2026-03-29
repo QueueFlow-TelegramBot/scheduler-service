@@ -1,32 +1,32 @@
 version: "3.9"
 services:
-  # postgres:
-  #   image: postgres:16
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: smartcampus
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: smartcampus
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
-  # rabbitmq:
-  #   image: rabbitmq:3-management
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-  #   environment:
-  #     RABBITMQ_DEFAULT_USER: guest
-  #     RABBITMQ_DEFAULT_PASS: guest
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
 
   service:
     build: .
     ports:
       - "8001:8001"
     environment:
-      DATABASE_URL: "postgresql+asyncpg://smartcampus_user_dev:c21hcnQtY2FtcHVzLWRldi1zZWNyZXQ=@192.168.0.140:5432/smartcampus_dev"
-      RABBITMQ_URL: "amqp://sheduling-service-dev:c2NoZWR1bGluZy1zZXJ2aWNlLWRldi1zZWNyZXQ=@192.168.0.141:5672/"
+      DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/smartcampus"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       RABBITMQ_EXCHANGE: "smartcampus-dev"
       APP_HOST: "0.0.0.0"
       APP_PORT: 8001
