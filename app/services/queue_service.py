@@ -55,10 +55,11 @@ async def get_next_in_queue(db: AsyncSession, rabbitmq: RabbitMQManager, room_id
             QueueEntry.room_id == room_id,
             QueueEntry.user_id == user_id,
             QueueEntry.status == "waiting",
-        )
+        ).order_by(QueueEntry.position.asc())
     )
-    entry = result.scalar_one_or_none()
-    position_served = entry.position if entry else 0
+
+    entry = result.scalars().first()
+    position_served = await rabbitmq.get_queue_length(f"room.{room_id}") + 1
     if entry:
         entry.status = "notified"
         await db.commit()
