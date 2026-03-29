@@ -41,6 +41,7 @@ class RabbitMQManager:
             raise RuntimeError("RabbitMQ not connected")
 
         queue = await self._channel.declare_queue(queue_name, passive=True)
+        await queue.bind(self._exchange, routing_key=queue_name)
         return queue.declaration_result.message_count
 
     async def publish(self, routing_key: str, body: dict):
@@ -67,9 +68,6 @@ class RabbitMQManager:
         try:
             queue = await self._channel.declare_queue(queue_name, durable=True)
             message = await queue.get(no_ack=False)
-
-            
-
             if message is None:
                 logger.warning(
                     "No message in queue",
