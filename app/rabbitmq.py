@@ -9,7 +9,7 @@ from aio_pika import ExchangeType
 from app.config import settings
 
 
-NOTIFICATION_QUEUE_NAME = "notifications"
+NOTIFICATION_QUEUE_NAME = f"{settings.RABBITMQ_EXCHANGE}.notifications"
 NOTIFICATION_ROUTING_KEY = f"{settings.RABBITMQ_EXCHANGE}.notification.*"
 
 logger = logging.getLogger(__name__)
