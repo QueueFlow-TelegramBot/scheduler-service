@@ -40,25 +40,25 @@ class RabbitMQManager:
         if self._channel is None:
             raise RuntimeError("RabbitMQ not connected")
 
-        queue = await self._channel.declare_queue(queue_name, passive=True)
-        await queue.bind(self._exchange, routing_key=queue_name)
+        queue = await self._channel.declare_queue(f"{settings.RABBITMQ_EXCHANGE}.{queue_name}", passive=True)
+        await queue.bind(self._exchange, routing_key=f"{settings.RABBITMQ_EXCHANGE}.{queue_name}")
         return queue.declaration_result.message_count
 
     async def publish(self, routing_key: str, body: dict):
         if self._exchange is None:
             raise RuntimeError("RabbitMQ not connected")
 
-        queue = await self._channel.declare_queue(routing_key, durable=True, auto_delete=False)
-        await queue.bind(self._exchange, routing_key=routing_key)
+        queue = await self._channel.declare_queue(f"{settings.RABBITMQ_EXCHANGE}.{routing_key}", durable=True, auto_delete=False)
+        await queue.bind(self._exchange, routing_key=f"{settings.RABBITMQ_EXCHANGE}.{routing_key}")
 
         message = aio_pika.Message(
             body=json.dumps(body).encode(),
             content_type="application/json",
         )
-        await self._exchange.publish(message, routing_key=routing_key)
+        await self._exchange.publish(message, routing_key=f"{settings.RABBITMQ_EXCHANGE}.{routing_key}")
         logger.info(
             "Message published",
-            extra={"action": "publish", "routing_key": routing_key, "queue_name": routing_key, "success": True},
+            extra={"action": "publish", "routing_key": f"{settings.RABBITMQ_EXCHANGE}.{routing_key}", "queue_name": f"{settings.RABBITMQ_EXCHANGE}.{routing_key}", "success": True},
         )
 
     async def pull_one(self, queue_name: str) -> Optional[dict]:
@@ -66,25 +66,25 @@ class RabbitMQManager:
             raise RuntimeError("RabbitMQ not connected")
 
         try:
-            queue = await self._channel.declare_queue(queue_name, durable=True)
+            queue = await self._channel.declare_queue(f"{settings.RABBITMQ_EXCHANGE}.{queue_name}", durable=True)
             message = await queue.get(no_ack=False)
             if message is None:
                 logger.warning(
                     "No message in queue",
-                    extra={"action": "consume", "routing_key": queue_name, "queue_name": queue_name, "success": False},
+                    extra={"action": "consume", "routing_key": f"{settings.RABBITMQ_EXCHANGE}.{queue_name}", "queue_name": f"{settings.RABBITMQ_EXCHANGE}.{queue_name}", "success": False},
                 )
                 return None
             await message.ack()
             data = json.loads(message.body.decode())
             logger.info(
                 "Message consumed",
-                extra={"action": "consume", "routing_key": queue_name, "queue_name": queue_name, "success": True},
+                extra={"action": "consume", "routing_key": f"{settings.RABBITMQ_EXCHANGE}.{queue_name}", "queue_name": f"{settings.RABBITMQ_EXCHANGE}.{queue_name}", "success": True},
             )
             return data
         except aio_pika.exceptions.QueueEmpty:
             logger.warning(
                 "Queue is empty",
-                extra={"action": "consume", "routing_key": queue_name, "queue_name": queue_name, "success": False},
+                extra={"action": "consume", "routing_key": f"{settings.RABBITMQ_EXCHANGE}.{queue_name}", "queue_name": f"{settings.RABBITMQ_EXCHANGE}.{queue_name}", "success": False},
             )
             return None
 
