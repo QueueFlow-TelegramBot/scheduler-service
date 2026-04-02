@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.logging_config import setup_logging
 from app.rabbitmq import rabbitmq_manager
-from app.routers import health, room
+from app.routers import health, room, analytics
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -62,3 +62,4 @@ async def logging_middleware(request: Request, call_next):
 
 app.include_router(health.router)
 app.include_router(room.router)
+app.include_router(analytics.router)
