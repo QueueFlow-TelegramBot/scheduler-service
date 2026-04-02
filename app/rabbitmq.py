@@ -10,7 +10,7 @@ from app.config import settings
 
 
 NOTIFICATION_QUEUE_NAME = "notifications"
-NOTIFICATION_ROUTING_KEY = "notification.*"
+NOTIFICATION_ROUTING_KEY = f"{settings.RABBITMQ_EXCHANGE}.notification.*"
 
 logger = logging.getLogger(__name__)
 
